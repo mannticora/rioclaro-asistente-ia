@@ -4,10 +4,11 @@ const sendButton = document.querySelector("#send-button");
 const messages = document.querySelector("#messages");
 const typingIndicator = document.querySelector("#typing-indicator");
 const formError = document.querySelector("#form-error");
+const chips = document.querySelector("#chips");
 
 let conversationId = null;
 
-function appendMessage(text, sender) {
+function appendMessage(text, sender, sources = []) {
   const article = document.createElement("article");
   article.className = `message ${sender}-message`;
 
@@ -15,17 +16,17 @@ function appendMessage(text, sender) {
     const avatar = document.createElement("span");
     avatar.className = "message-avatar";
     avatar.setAttribute("aria-hidden", "true");
-    avatar.textContent = "C";
+    avatar.textContent = "R";
 
     const content = document.createElement("div");
     content.className = "message-content";
 
     const author = document.createElement("p");
     author.className = "message-author";
-    author.textContent = "Certifica";
+    author.textContent = "Río Claro ";
 
     const role = document.createElement("span");
-    role.textContent = "Asistente";
+    role.textContent = "Asistente IA";
     author.append(role);
 
     const messageText = document.createElement("p");
@@ -33,6 +34,14 @@ function appendMessage(text, sender) {
     messageText.textContent = text;
 
     content.append(author, messageText);
+
+    if (sources.length > 0) {
+      const sourcesLine = document.createElement("p");
+      sourcesLine.className = "message-sources";
+      sourcesLine.textContent = `Fuentes: ${sources.join(", ")}`;
+      content.append(sourcesLine);
+    }
+
     article.append(avatar, content);
   } else {
     const messageText = document.createElement("p");
@@ -43,6 +52,7 @@ function appendMessage(text, sender) {
 
   messages.append(article);
   messages.scrollTop = messages.scrollHeight;
+  article.scrollIntoView({ block: "end", behavior: "smooth" });
 }
 
 form.addEventListener("submit", async (event) => {
@@ -86,7 +96,7 @@ form.addEventListener("submit", async (event) => {
     }
 
     conversationId = data.conversation_id;
-    appendMessage(data.reply, "assistant");
+    appendMessage(data.reply, "assistant", Array.isArray(data.sources) ? data.sources : []);
   } catch {
     appendMessage("No fue posible obtener una respuesta. Inténtalo de nuevo.", "assistant");
   } finally {
@@ -94,6 +104,13 @@ form.addEventListener("submit", async (event) => {
     typingIndicator.hidden = true;
     input.focus();
   }
+});
+
+chips.addEventListener("click", (event) => {
+  const chip = event.target.closest(".chip");
+  if (!chip) return;
+  input.value = chip.textContent.trim();
+  form.requestSubmit();
 });
 
 input.addEventListener("keydown", (event) => {

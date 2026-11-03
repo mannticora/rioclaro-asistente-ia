@@ -5,7 +5,7 @@ import { DefaultAzureCredential } from "@azure/identity";
 
 /*
 
-SDK: Software Development Kit 
+SDK: Software Development Kit
 AIProjectClient: Para todo tipo de agente o servicio de Microsoft Foundry
   - Este usa el endpoint del proyecto
 AzureOpenAIClient: Para el modelo GPT de Microsoft Foundry
@@ -37,6 +37,27 @@ function logFoundryFailure(error) {
     statusCode: error?.statusCode ?? error?.status,
     message: safeMessage,
   });
+}
+
+// Extrae los nombres de los documentos que el agente citó (File search).
+// Transparencia: el usuario ve de qué documento salió cada respuesta.
+function extractSources(result) {
+  const names = new Set();
+  for (const item of result?.output ?? []) {
+    if (item?.type !== "message") continue;
+    for (const part of item.content ?? []) {
+      for (const annotation of part?.annotations ?? []) {
+        if (process.env.DEBUG_ANNOTATIONS) {
+          console.log("annotation", annotation?.type, Object.keys(annotation ?? {}));
+        }
+        const name = annotation?.filename ?? annotation?.file_name ?? annotation?.title;
+        if (name && typeof name === "string") {
+          names.add(name);
+        }
+      }
+    }
+  }
+  return [...names];
 }
 
 if (foundryConfigured) {
@@ -93,6 +114,7 @@ app.post("/api/chat", async (request, response) => {
     response.json({
       reply: result.output_text,
       conversation_id: conversationId,
+      sources: extractSources(result),
     });
   } catch (error) {
     logFoundryFailure(error);

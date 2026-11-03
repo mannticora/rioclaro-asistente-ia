@@ -4,36 +4,48 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#f2f5ef">
-    <title>Certifica | Asistente</title>
+    <title>Río Claro | Asistente virtual</title>
     <link rel="stylesheet" href="/styles.css">
     <script src="/app.js" defer></script>
   </head>
   <body>
     <div class="app-layout">
       <header class="topbar">
-        <a class="brand" href="/" aria-label="Certifica, inicio">
-          <span class="brand-mark" aria-hidden="true">C</span>
-          <span class="brand-name">certifica<span>.</span></span>
+        <a class="brand" href="/" aria-label="Distribuidora Río Claro, inicio">
+          <span class="brand-mark" aria-hidden="true">R</span>
+          <span class="brand-name">río claro<span>.</span></span>
         </a>
         <div class="topbar-context">
           <span class="context-dot" aria-hidden="true"></span>
-          <span>Asistente de certificación</span>
+          <span>Asistente virtual con IA</span>
         </div>
       </header>
 
       <main class="chat-shell">
         <section class="conversation" aria-label="Conversación">
           <div class="conversation-heading">
-            <p class="eyebrow">CONSULTA</p>
-            <h1>¿En qué te puedo orientar?</h1>
+            <p class="eyebrow">DISTRIBUIDORA RÍO CLARO</p>
+            <h1>¿En qué te puedo ayudar?</h1>
+          </div>
+
+          <p class="ai-notice" role="note">
+            Estás hablando con una inteligencia artificial. Una persona del equipo revisa lo importante
+            y solo una persona aprueba devoluciones, reembolsos o pagos.
+          </p>
+
+          <div class="chips" id="chips" aria-label="Preguntas sugeridas">
+            <button class="chip" type="button">¿Cuánto cloro de litro hay en León?</button>
+            <button class="chip" type="button">¿Cuánto cuesta el Blanqueador 1000ml?</button>
+            <button class="chip" type="button">¿Cuál es la política de devoluciones?</button>
+            <button class="chip" type="button">Quiero registrar una queja por un pedido tardío</button>
           </div>
 
           <div class="messages" id="messages" aria-live="polite" aria-relevant="additions text">
             <article class="message assistant-message">
-              <span class="message-avatar" aria-hidden="true">C</span>
+              <span class="message-avatar" aria-hidden="true">R</span>
               <div class="message-content">
-                <p class="message-author">Certifica <span>Asistente</span></p>
-                <p class="message-text">Hola. ¿Qué tema de certificación quieres revisar?</p>
+                <p class="message-author">Río Claro <span>Asistente IA</span></p>
+                <p class="message-text">Hola, soy el asistente virtual de Distribuidora Río Claro y soy una inteligencia artificial. Pregúntame por productos, precios, existencias por sucursal o políticas, o cuéntame si tienes una queja para registrarla.</p>
               </div>
             </article>
           </div>
