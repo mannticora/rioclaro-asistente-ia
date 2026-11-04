@@ -28,6 +28,8 @@ const foundryConfigured = Boolean(agentName && projectEndpoint);
 
 // Una factura se marca para revisión humana si algún campo tiene menos confianza que esto.
 const MIN_CONFIDENCE = Number(process.env.MIN_CONFIDENCE ?? 0.8);
+// Proveedor y folio se leen con menos confianza en facturas de formato libre.
+const MIN_CONFIDENCE_TEXT = Number(process.env.MIN_CONFIDENCE_TEXT ?? 0.45);
 
 const credential = new DefaultAzureCredential();
 let openAIClient;
@@ -123,7 +125,7 @@ async function analyzeInvoice(buffer) {
   return finished.body.analyzeResult;
 }
 
-function readField(doc, name, pick) {
+function readField(doc, name, pick, threshold = MIN_CONFIDENCE) {
   const field = doc?.fields?.[name];
   if (!field) {
     return { valor: null, confianza: 0, dudoso: true };
@@ -131,19 +133,20 @@ function readField(doc, name, pick) {
   const raw = pick(field);
   const valor = raw === undefined || raw === null || raw === "" ? null : raw;
   const confianza = Number((field.confidence ?? 0).toFixed(2));
-  return { valor, confianza, dudoso: valor === null || confianza < MIN_CONFIDENCE };
+  return { valor, confianza, dudoso: valor === null || confianza < threshold };
 }
 
 function buildRecord(filename, analysis, existing) {
   const doc = analysis?.documents?.[0];
 
   const campos = {
-    proveedor: readField(doc, "VendorName", (f) => f.valueString ?? f.content),
-    folio: readField(doc, "InvoiceId", (f) => f.valueString ?? f.content),
+    proveedor: readField(doc, "VendorName", (f) => f.valueString ?? f.content, MIN_CONFIDENCE_TEXT),
+    folio: readField(doc, "InvoiceId", (f) => f.valueString ?? f.content, MIN_CONFIDENCE_TEXT),
     fecha: readField(doc, "InvoiceDate", (f) => f.valueDate ?? f.content),
     total: readField(doc, "InvoiceTotal", (f) => f.valueCurrency?.amount ?? f.content),
   };
-  const moneda = doc?.fields?.InvoiceTotal?.valueCurrency?.currencyCode ?? "MXN";
+  // Río Claro opera en pesos: el modelo interpreta "$" como USD, así que fijamos la moneda.
+  const moneda = process.env.INVOICE_CURRENCY ?? "MXN";
 
   const confianzas = Object.values(campos).map((c) => c.confianza);
   const confianzaMinima = Math.min(...confianzas);
