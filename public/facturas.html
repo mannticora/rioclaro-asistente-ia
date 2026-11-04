@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f2f5ef">
+    <title>Río Claro | Facturas</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script src="/facturas.js" defer></script>
+    <style>
+      .topbar-link{color:inherit;font-size:.9rem;margin-left:1rem;text-decoration:underline}
+      .page{max-width:960px;margin:0 auto;padding:1.25rem}
+      .card{border:1px solid rgba(127,127,127,.35);background:rgba(127,127,127,.12);border-radius:.8rem;padding:1rem;margin:0 0 1rem}
+      .card h2{margin:0 0 .5rem;font-size:1.05rem}
+      .row{display:flex;flex-wrap:wrap;gap:.75rem;align-items:center;margin:.5rem 0}
+      .row input[type=text]{flex:1 1 220px;padding:.55rem .7rem;border-radius:.5rem;border:1px solid rgba(127,127,127,.45);background:transparent;color:inherit;font:inherit}
+      .row input[type=file]{flex:1 1 260px;color:inherit}
+      .note{font-size:.88rem;opacity:.85;margin:.25rem 0}
+      .status-line{min-height:1.4rem;font-size:.92rem}
+      .invoice-head{display:flex;justify-content:space-between;gap:.5rem;flex-wrap:wrap;font-weight:600}
+      .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:.6rem;margin:.7rem 0}
+      .cell small{display:block;opacity:.75;font-size:.78rem}
+      .cell .doubt{font-weight:600}
+      .reasons{margin:.4rem 0 .2rem;padding-left:1.1rem;font-size:.9rem}
+      .actions{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.6rem}
+      .ghost{cursor:pointer;border:1px solid rgba(127,127,127,.5);background:transparent;color:inherit;border-radius:.5rem;padding:.5rem .9rem;font:inherit}
+      .ghost:disabled{opacity:.45;cursor:not-allowed}
+    </style>
+  </head>
+  <body>
+    <div class="app-layout">
+      <header class="topbar">
+        <a class="brand" href="/" aria-label="Distribuidora Río Claro, inicio">
+          <span class="brand-mark" aria-hidden="true">R</span>
+          <span class="brand-name">río claro<span>.</span></span>
+        </a>
+        <div class="topbar-context">
+          <span class="context-dot" aria-hidden="true"></span>
+          <span>Facturas de proveedores</span>
+          <a class="topbar-link" href="/">Asistente</a>
+        </div>
+      </header>
+
+      <main class="page">
+        <h1>Facturas de proveedores</h1>
+        <p class="note">
+          La IA lee la factura (PDF o foto) y propone proveedor, folio, fecha y total.
+          Si la lectura es dudosa o parece repetida, <strong>no decide</strong>: la marca para que una persona la revise.
+          Solo una persona puede aprobar un pago.
+        </p>
+
+        <section class="card" aria-label="Subir factura">
+          <h2>1. Subir una factura</h2>
+          <form id="upload-form">
+            <div class="row">
+              <input id="file-input" type="file" accept="application/pdf,image/png,image/jpeg" required>
+              <button class="send-button" id="analyze-button" type="submit"><span>Leer factura</span></button>
+            </div>
+            <p class="status-line" id="upload-status" role="status"></p>
+          </form>
+        </section>
+
+        <section class="card" aria-label="Persona que revisa">
+          <h2>2. ¿Quién revisa?</h2>
+          <div class="row">
+            <input id="approver" type="text" maxlength="80" placeholder="Nombre de la persona que aprueba o rechaza (ej. Laura)" autocomplete="off">
+          </div>
+          <p class="note">Queda registrado quién tomó cada decisión.</p>
+        </section>
+
+        <section aria-label="Facturas registradas">
+          <h2>3. Facturas registradas</h2>
+          <div id="invoice-list"></div>
+          <div class="row">
+            <button class="ghost" id="reset-button" type="button">Vaciar lista (solo para pruebas)</button>
+          </div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
