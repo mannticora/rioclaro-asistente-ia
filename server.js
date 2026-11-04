@@ -4,6 +4,7 @@ import crypto from "node:crypto";
 import express from "express";
 import { AIProjectClient } from "@azure/ai-projects";
 import { DefaultAzureCredential } from "@azure/identity";
+import { TextAnalysisClient } from "@azure/ai-language-text";
 import DocumentIntelligence, {
   getLongRunningPoller,
   isUnexpected,
@@ -23,17 +24,19 @@ const port = Number(process.env.PORT) || 3000;
 const agentName = process.env.FOUNDRY_AGENT_NAME;
 const projectEndpoint = process.env.FOUNDRY_PROJECT_ENDPOINT;
 const docintelEndpoint = process.env.DOCINTEL_ENDPOINT;
+const languageEndpoint = process.env.LANGUAGE_ENDPOINT;
 const publicDirectory = path.join(import.meta.dirname, "public");
 const foundryConfigured = Boolean(agentName && projectEndpoint);
 
 // Una factura se marca para revisión humana si algún campo tiene menos confianza que esto.
 const MIN_CONFIDENCE = Number(process.env.MIN_CONFIDENCE ?? 0.8);
-// Proveedor y folio se leen con menos confianza en facturas de formato libre.
+// Proveedor y folio se leen con menos confianza en facturas de formato libre; el total y la fecha siguen exigiendo MIN_CONFIDENCE.
 const MIN_CONFIDENCE_TEXT = Number(process.env.MIN_CONFIDENCE_TEXT ?? 0.45);
 
 const credential = new DefaultAzureCredential();
 let openAIClient;
 let documentClient;
+let languageClient;
 
 function logFailure(label, error) {
   const message = error instanceof Error ? error.message : "Unknown error.";
@@ -77,6 +80,10 @@ if (foundryConfigured) {
 
 if (docintelEndpoint) {
   documentClient = DocumentIntelligence(docintelEndpoint, credential);
+}
+
+if (languageEndpoint) {
+  languageClient = new TextAnalysisClient(languageEndpoint, credential);
 }
 
 /* ---------- Almacén sencillo de facturas (archivo JSON) ---------- */
@@ -353,6 +360,191 @@ app.post("/api/facturas/reset", (request, response) => {
   }
   saveInvoices([]);
   response.json({ ok: true });
+});
+
+
+/* ---------- Quejas con análisis de sentimiento (Azure AI Language) ---------- */
+
+const complaintsFile = path.join(dataDirectory, "quejas.json");
+const BRANCHES = ["Guadalajara", "Zapopan", "León", "Querétaro", "Aguascalientes"];
+// Frases demasiado genéricas para considerar que dos quejas son "la misma".
+const GENERIC_PHRASES = new Set(["pedido", "cliente", "problema", "favor", "gracias", "queja", "hola", "servicio"]);
+const FIRST_RESPONSE_MINUTES = 15;
+
+function loadComplaints() {
+  try {
+    return JSON.parse(fs.readFileSync(complaintsFile, "utf8"));
+  } catch {
+    return [];
+  }
+}
+
+function saveComplaints(list) {
+  fs.mkdirSync(dataDirectory, { recursive: true });
+  fs.writeFileSync(complaintsFile, JSON.stringify(list, null, 2));
+}
+
+async function analyzeComplaint(text) {
+  const [sentiment] = await languageClient.analyze(
+    "SentimentAnalysis",
+    [{ id: "1", text, language: "es" }],
+  );
+  if (!sentiment || sentiment.error) {
+    throw new Error(sentiment?.error?.message ?? "Language service error.");
+  }
+
+  const [phrases] = await languageClient.analyze(
+    "KeyPhraseExtraction",
+    [{ id: "1", text, language: "es" }],
+  );
+
+  const scores = sentiment.confidenceScores ?? {};
+  return {
+    sentimiento: sentiment.sentiment,
+    confianza: {
+      positivo: Number((scores.positive ?? 0).toFixed(2)),
+      neutral: Number((scores.neutral ?? 0).toFixed(2)),
+      negativo: Number((scores.negative ?? 0).toFixed(2)),
+    },
+    frasesClave: phrases && !phrases.error ? (phrases.keyPhrases ?? []).slice(0, 8) : [],
+  };
+}
+
+function buildComplaint({ cliente, sucursal, pedido, mensaje }, analysis, existing) {
+  const clientKey = normalize(cliente);
+  const orderKey = normalize(pedido);
+  const phraseKeys = new Set(
+    analysis.frasesClave.map(normalize).filter((phrase) => phrase && !GENERIC_PHRASES.has(phrase)),
+  );
+
+  // Misma queja repetida: mismo cliente y mismo pedido, o al menos una frase clave en común.
+  const related = existing.filter((other) => {
+    if (normalize(other.cliente) !== clientKey) return false;
+    const sameOrder = orderKey && normalize(other.pedido) === orderKey;
+    const sharedPhrase = other.frasesClave.some((phrase) => phraseKeys.has(normalize(phrase)));
+    return sameOrder || sharedPhrase;
+  });
+
+  const motivos = [];
+  const escalada = related.length >= 1;
+  if (escalada) {
+    motivos.push(
+      `Queja repetida (${related.length + 1} veces del mismo cliente): se escala a la persona gerente de ${sucursal}, según la política de atención.`,
+    );
+  }
+  if (analysis.sentimiento === "negative" || analysis.sentimiento === "mixed") {
+    motivos.push(`Sentimiento ${analysis.sentimiento === "negative" ? "negativo" : "mixto"}: dar seguimiento prioritario.`);
+  }
+  motivos.push(`Primera respuesta de una persona en máximo ${FIRST_RESPONSE_MINUTES} minutos en horario de atención.`);
+
+  const now = Date.now();
+  return {
+    id: crypto.randomUUID(),
+    creadaEn: new Date(now).toISOString(),
+    responderAntes: new Date(now + FIRST_RESPONSE_MINUTES * 60 * 1000).toISOString(),
+    cliente,
+    sucursal,
+    pedido: pedido || null,
+    mensaje,
+    ...analysis,
+    relacionadasCon: related.map((item) => item.id),
+    escalada,
+    motivos,
+    estado: "abierta",
+    atendidaPor: null,
+    atendidaEn: null,
+  };
+}
+
+app.get("/api/quejas", (_request, response) => {
+  const list = loadComplaints().sort((a, b) => b.creadaEn.localeCompare(a.creadaEn));
+  const porSucursal = Object.fromEntries(BRANCHES.map((name) => [name, { total: 0, negativas: 0 }]));
+  for (const item of list) {
+    if (!porSucursal[item.sucursal]) continue;
+    porSucursal[item.sucursal].total += 1;
+    if (item.sentimiento === "negative") porSucursal[item.sucursal].negativas += 1;
+  }
+  response.json({
+    quejas: list,
+    resumen: {
+      total: list.length,
+      abiertas: list.filter((item) => item.estado === "abierta").length,
+      negativas: list.filter((item) => item.sentimiento === "negative").length,
+      escaladas: list.filter((item) => item.escalada).length,
+      porSucursal,
+    },
+  });
+});
+
+app.post("/api/quejas", async (request, response) => {
+  const clean = (value, max) => (typeof value === "string" ? value.trim().slice(0, max) : "");
+  const data = {
+    cliente: clean(request.body?.cliente, 80),
+    sucursal: clean(request.body?.sucursal, 30),
+    pedido: clean(request.body?.pedido, 40),
+    mensaje: clean(request.body?.mensaje, 1000),
+  };
+
+  if (data.cliente.length < 2) {
+    response.status(422).json({ error: "Escribe el nombre del cliente." });
+    return;
+  }
+  if (!BRANCHES.includes(data.sucursal)) {
+    response.status(422).json({ error: "Elige la sucursal que surtió el pedido." });
+    return;
+  }
+  if (data.mensaje.length < 10) {
+    response.status(422).json({ error: "Describe la queja con al menos 10 caracteres." });
+    return;
+  }
+  if (!languageClient) {
+    response.status(502).json({ error: "El análisis de quejas no está configurado." });
+    return;
+  }
+
+  try {
+    const analysis = await analyzeComplaint(data.mensaje);
+    const list = loadComplaints();
+    const complaint = buildComplaint(data, analysis, list);
+    list.push(complaint);
+    saveComplaints(list);
+    response.status(201).json({ queja: complaint });
+  } catch (error) {
+    logFailure("Language request failed", error);
+    response.status(502).json({ error: "No fue posible analizar la queja. Inténtalo de nuevo." });
+  }
+});
+
+app.post("/api/quejas/reset", (request, response) => {
+  if (request.body?.confirmar !== "si") {
+    response.status(422).json({ error: "Falta la confirmación." });
+    return;
+  }
+  saveComplaints([]);
+  response.json({ ok: true });
+});
+
+app.post("/api/quejas/:id/cerrar", (request, response) => {
+  const list = loadComplaints();
+  const complaint = list.find((item) => item.id === request.params.id);
+  if (!complaint) {
+    response.status(404).json({ error: "No se encontró la queja." });
+    return;
+  }
+  const person = typeof request.body?.persona === "string" ? request.body.persona.trim() : "";
+  if (person.length < 2 || person.length > 80) {
+    response.status(422).json({ error: "Escribe el nombre de la persona que da seguimiento (2 a 80 caracteres)." });
+    return;
+  }
+  if (complaint.estado === "cerrada") {
+    response.status(409).json({ error: "Esta queja ya está cerrada." });
+    return;
+  }
+  complaint.estado = "cerrada";
+  complaint.atendidaPor = person;
+  complaint.atendidaEn = new Date().toISOString();
+  saveComplaints(list);
+  response.json({ queja: complaint });
 });
 
 app.use((error, _request, response, _next) => {

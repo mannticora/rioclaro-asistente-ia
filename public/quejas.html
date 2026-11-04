@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f2f5ef">
+    <title>Río Claro | Quejas</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script src="/quejas.js" defer></script>
+    <style>
+      .topbar-link{color:inherit;font-size:.9rem;margin-left:1rem;text-decoration:underline}
+      .page{max-width:960px;margin:0 auto;padding:1.25rem}
+      .card{border:1px solid rgba(127,127,127,.35);background:rgba(127,127,127,.12);border-radius:.8rem;padding:1rem;margin:0 0 1rem}
+      .card h2{margin:0 0 .5rem;font-size:1.05rem}
+      .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.75rem;margin:.5rem 0}
+      .field label{display:block;font-size:.82rem;opacity:.8;margin-bottom:.2rem}
+      .field input,.field select,.field textarea{width:100%;box-sizing:border-box;padding:.55rem .7rem;border-radius:.5rem;border:1px solid rgba(127,127,127,.45);background:transparent;color:inherit;font:inherit}
+      .field select option{color:#111}
+      .field textarea{min-height:110px;resize:vertical}
+      .note{font-size:.88rem;opacity:.85;margin:.25rem 0}
+      .status-line{min-height:1.4rem;font-size:.92rem}
+      .summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.6rem;margin:.6rem 0}
+      .summary .stat{border:1px solid rgba(127,127,127,.35);border-radius:.6rem;padding:.6rem .8rem}
+      .summary .stat b{display:block;font-size:1.3rem}
+      .branches{width:100%;border-collapse:collapse;font-size:.9rem;margin-top:.5rem}
+      .branches th,.branches td{text-align:left;padding:.3rem .5rem;border-bottom:1px solid rgba(127,127,127,.3)}
+      .invoice-head{display:flex;justify-content:space-between;gap:.5rem;flex-wrap:wrap;font-weight:600}
+      .msg{margin:.6rem 0;padding:.6rem .8rem;border-left:3px solid rgba(127,127,127,.6);font-size:.95rem}
+      .tags{display:flex;gap:.4rem;flex-wrap:wrap;margin:.4rem 0}
+      .tag{font-size:.8rem;padding:.15rem .55rem;border-radius:999px;border:1px solid rgba(127,127,127,.5)}
+      .reasons{margin:.4rem 0 .2rem;padding-left:1.1rem;font-size:.9rem}
+      .actions{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.6rem}
+      .ghost{cursor:pointer;border:1px solid rgba(127,127,127,.5);background:transparent;color:inherit;border-radius:.5rem;padding:.5rem .9rem;font:inherit}
+    </style>
+  </head>
+  <body>
+    <div class="app-layout">
+      <header class="topbar">
+        <a class="brand" href="/" aria-label="Distribuidora Río Claro, inicio">
+          <span class="brand-mark" aria-hidden="true">R</span>
+          <span class="brand-name">río claro<span>.</span></span>
+        </a>
+        <div class="topbar-context">
+          <span class="context-dot" aria-hidden="true"></span>
+          <span>Quejas de clientes</span>
+          <a class="topbar-link" href="/">Asistente</a>
+          <a class="topbar-link" href="/facturas.html">Facturas</a>
+        </div>
+      </header>
+
+      <main class="page">
+        <h1>Quejas de clientes</h1>
+        <p class="note">
+          Toda queja queda registrada con folio, sucursal y sentimiento (analizado por una IA).
+          Si el mismo cliente repite la queja, se marca para escalar a la persona gerente de la sucursal.
+          La IA no resuelve la queja: una persona responde en máximo 15 minutos.
+        </p>
+
+        <section class="card" aria-label="Registrar queja">
+          <h2>1. Registrar una queja</h2>
+          <form id="complaint-form">
+            <div class="form-grid">
+              <div class="field"><label for="cliente">Cliente</label><input id="cliente" maxlength="80" placeholder="Ej. Hotel Mirador" required></div>
+              <div class="field">
+                <label for="sucursal">Sucursal que surtió el pedido</label>
+                <select id="sucursal" required>
+                  <option value="">Elige…</option>
+                  <option>Guadalajara</option><option>Zapopan</option><option>León</option><option>Querétaro</option><option>Aguascalientes</option>
+                </select>
+              </div>
+              <div class="field"><label for="pedido">Número de pedido (opcional)</label><input id="pedido" maxlength="40" placeholder="Ej. P-2231"></div>
+            </div>
+            <div class="field"><label for="mensaje">¿Qué pasó?</label><textarea id="mensaje" maxlength="1000" placeholder="Cuenta el problema con tus palabras" required></textarea></div>
+            <div class="actions"><button class="send-button" id="submit-button" type="submit"><span>Registrar queja</span></button></div>
+            <p class="status-line" id="form-status" role="status"></p>
+          </form>
+        </section>
+
+        <section class="card" aria-label="Persona que da seguimiento">
+          <h2>2. ¿Quién da seguimiento?</h2>
+          <div class="field"><input id="agent" maxlength="80" placeholder="Nombre de la persona que cierra la queja (ej. Mariana)" autocomplete="off"></div>
+        </section>
+
+        <section aria-label="Resumen">
+          <h2>3. Resumen</h2>
+          <div class="summary" id="summary"></div>
+          <table class="branches" id="branches"></table>
+        </section>
+
+        <section aria-label="Quejas registradas">
+          <h2>4. Quejas registradas</h2>
+          <div id="complaint-list"></div>
+          <div class="actions"><button class="ghost" id="reset-button" type="button">Vaciar lista (solo para pruebas)</button></div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

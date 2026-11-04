@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@azure-rest/ai-document-intelligence": "^1.1.0",
+    "@azure/ai-language-text": "^1.1.0",
     "@azure/ai-projects": "^2.7.1",
     "@azure/identity": "^4.10.1",
     "express": "^5.1.0"
